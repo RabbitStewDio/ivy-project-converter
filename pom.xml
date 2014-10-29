@@ -1,0 +1,73 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.rabbitstewdio.build</groupId>
+  <artifactId>ivyconverter</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+
+  <properties>
+    <dependencies.scala.version>2.11.2</dependencies.scala.version>
+    <dependencies.scala.version.short>2.11</dependencies.scala.version.short>
+    <dependencies.slf4j.version>1.7.6</dependencies.slf4j.version>
+  </properties>
+
+  <parent>
+    <groupId>rabbitstewdio</groupId>
+    <artifactId>global-parent-pom</artifactId>
+    <version>1.2.2</version>
+  </parent>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-embedder</artifactId>
+        <version>3.2.3</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.apache.ant</groupId>
+    	<artifactId>ant</artifactId>
+    	<version>1.9.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <version>${dependencies.scala.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-reflect</artifactId>
+      <version>${dependencies.scala.version}</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.scala-lang.modules</groupId>
+    	<artifactId>scala-xml_${dependencies.scala.version.short}</artifactId>
+    	<version>1.0.2</version>
+    </dependency>
+    <dependency>
+      <groupId>org.clapper</groupId>
+      <artifactId>argot_${dependencies.scala.version.short}</artifactId>
+      <version>1.0.3</version>
+    </dependency>
+    <dependency>
+        <groupId>com.typesafe</groupId>
+        <artifactId>config</artifactId>
+        <version>1.2.1</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.ivy</groupId>
+        <artifactId>ivy</artifactId>
+        <version>2.3.0</version>
+    </dependency>
+  </dependencies>
+
+</project>
