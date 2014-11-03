@@ -255,6 +255,7 @@ object Main {
       case "runtime" => true
       case "compile" => true
       case "test" => true
+      case _ => false
     }
   }
 

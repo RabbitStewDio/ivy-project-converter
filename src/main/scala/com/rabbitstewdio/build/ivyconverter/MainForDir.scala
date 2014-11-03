@@ -41,7 +41,12 @@ object MainForDir {
 
   def findSubDirs(dir: String): List[File] = {
     val path = new File(dir)
-    val projectDirs = path.listFiles().filter(f => {
+    val listFiles: Array[File] = path.listFiles()
+    if (listFiles == null) {
+      throw new IllegalStateException("Directory " + dir + " is not valid." + path.getAbsolutePath)
+    }
+
+    val projectDirs = listFiles.filter(f => {
       if (!f.isDirectory) {
         false
       }
