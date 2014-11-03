@@ -13,9 +13,9 @@
   </properties>
 
   <parent>
-    <groupId>rabbitstewdio</groupId>
+    <groupId>com.rabbitstewdio</groupId>
     <artifactId>global-parent-pom</artifactId>
-    <version>1.2.2</version>
+    <version>1.2.4</version>
   </parent>
 
   <build>
