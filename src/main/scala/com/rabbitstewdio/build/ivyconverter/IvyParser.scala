@@ -58,7 +58,7 @@ object IvyParser {
         case "test" => "test"
         case "runtime" => "runtime"
         case "provided" => "provided"
-        case _ => "compile"
+        case _ => conf
       }
     }
   }

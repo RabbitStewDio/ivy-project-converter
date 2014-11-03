@@ -8,6 +8,7 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Writer
 import org.apache.maven.model.{Build, Dependency, Exclusion, Model, Parent, Plugin, PluginExecution, Resource}
 import org.clapper.argot.ArgotConverters._
 import org.clapper.argot.{ArgotException, ArgotParser}
+import org.codehaus.plexus.util.xml.Xpp3Dom
 
 import scala.collection.JavaConverters._
 
@@ -49,6 +50,7 @@ object Main {
     val parser = new ArgotParser("ivyconverter")
     val config = parser.option[String](List("c", "config"), "config.conf", "A configuration file")
     val dirs = parser.multiParameter[String]("directories", "target directories", optional = false)
+    val print = parser.flag[Boolean](List("p", "print"), "print generated POM")
 
     try {
 
@@ -57,7 +59,7 @@ object Main {
       val configObj = loadConfig(config.value.map(f => new File(f)))
 
       val projectDefs: List[ProjectDef] = validateArgDirectories(dirs.value, configObj)
-      projectDefs.map(IvyParser.loadDependencyInformation).map(translateDependenciesToMaven).map(generateMavenPom)
+      projectDefs.map(IvyParser.loadDependencyInformation).map(translateDependenciesToMaven).map(generateMavenPom(print.value.getOrElse(false)))
     }
     catch {
       case e: ArgotException => parser.usage()
@@ -153,7 +155,7 @@ object Main {
     }
     md.setVersion(d.rev)
     d.classifier.foreach(c => md.setClassifier(c))
-    if (d.transiative) {
+    if (d.transitive) {
       d.exclusions.foreach(d => md.addExclusion(toMavenExclusion(d)))
     }
     else {
@@ -202,7 +204,7 @@ object Main {
       buildModified = true
     }
 
-    if (project.properties.getOrElse("tests.publish", "true") == "true") {
+    if (project.properties.getOrElse("tests.publish", "false") == "true") {
       val exec = new PluginExecution
       exec.addGoal("test-jar")
 
@@ -215,6 +217,22 @@ object Main {
       build.addPlugin(publishTest)
 
       buildModified = true
+    }
+
+    val plugins = project.deps.filterNot(notPlugin)
+    if (!plugins.isEmpty) {
+
+      val items = new Xpp3Dom("artifactItems")
+
+      val processResources = new PluginExecution
+      processResources.addGoal("copy")
+      processResources.setPhase("process-test")
+      processResources.setConfiguration()
+
+      val dependencies = new Plugin
+      dependencies.setArtifactId("maven-dependency-plugin")
+      dependencies.setGroupId("org.apache.maven.plugins")
+      dependencies.setVersion("2.8")
     }
 
     if (buildModified) {
@@ -231,7 +249,16 @@ object Main {
     "${project.basedir}/" + dir.substring(basedir.length)
   }
 
-  private def generateMavenPom(proj: ParsedProject) = {
+  private def notPlugin(p: ProjectDependency) = {
+    p.scope match {
+      case "provided" => true
+      case "runtime" => true
+      case "compile" => true
+      case "test" => true
+    }
+  }
+
+  private def generateMavenPom(print: Boolean)(proj: ParsedProject) = {
     val model = new Model()
     model.setModelVersion("4.0.0")
     model.setParent(createParent(proj.config))
@@ -239,7 +266,6 @@ object Main {
     model.setPackaging(proj.config.getString("properties.packaging"))
     model.setDescription(proj.properties.getOrElse("imple.title", null))
     model.setProperties(filterProjectProperties(proj))
-    createBuild(proj).foreach(model.setBuild)
 
     val group = proj.properties("ivy.artifact.group")
     if (group != model.getParent.getGroupId) {
@@ -251,15 +277,21 @@ object Main {
       model.setVersion(version)
     }
 
-    proj.deps.map(toMaven).foreach(d => model.addDependency(d))
+    proj.deps.filter(notPlugin).map(toMaven).foreach(d => model.addDependency(d))
+    createBuild(proj).foreach(model.setBuild)
 
-    val targetFile = new File(proj.dir, "pom.xml")
-    val fout = new FileOutputStream(targetFile)
-    try {
-      new MavenXpp3Writer().write(fout, model)
+    if (print) {
+      new MavenXpp3Writer().write(System.out, model)
     }
-    finally {
-      fout.close()
+    else {
+      val targetFile = new File(proj.dir, "pom.xml")
+      val fout = new FileOutputStream(targetFile)
+      try {
+        new MavenXpp3Writer().write(fout, model)
+      }
+      finally {
+        fout.close()
+      }
     }
     true
   }
