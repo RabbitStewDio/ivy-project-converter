@@ -3,6 +3,7 @@ package com.rabbitstewdio.build.ivyconverter
 import java.io.File
 import java.util
 
+import com.typesafe.config.{ConfigException, Config}
 import org.apache.tools.ant.{ProjectHelper, Project}
 
 import scala.collection.JavaConverters._
@@ -25,21 +26,27 @@ object IvyParser {
     val parsed = scala.xml.XML.loadFile(ivyFile)
 
     val defaultConf = (parsed \\ "dependencies/@defaultconf").text
-    val deps = (parsed \\ "dependency").map(parseDependencies(defaultConf))
+    val deps = (parsed \\ "dependency").map(parseDependencies(defaultConf, pd.config))
     ParsedProject(pd.dir, pd.config, properties, deps)
   }
 
   private def parseExclusion(defaultConf: String)(n: Node): ProjectExclusion = {
     val attrs = n.attributes.asAttrMap
     val org = attrs.get("org")
-    val name = attrs.get("module")
-    ProjectExclusion(org, name)
+    val module = attrs.get("module")
+    if (module != None) {
+      ProjectExclusion(org, module)
+    }
+    else {
+      val name = attrs.get("name")
+      ProjectExclusion(org, name)
+    }
   }
 
-  private def parseDependencies(defaultConf: String)(n: Node): ProjectDependency = {
+  private def parseDependencies(defaultConf: String, config: Config)(n: Node): ProjectDependency = {
     val excludes = (n \\ "exclude").map(parseExclusion(defaultConf)).toList
     val attrs = n.attributes.asAttrMap
-    val scope = parseScope(attrs.getOrElse("conf", defaultConf))
+    val scope = parseScope(attrs.getOrElse("conf", defaultConf), config)
     val transitive = attrs.getOrElse("transitive", "true") == "true"
     val rev = attrs("rev")
     val org = attrs("org")
@@ -48,7 +55,7 @@ object IvyParser {
     ProjectDependency(org, name, rev, transitive, scope, classifier, excludes)
   }
 
-  private def parseScope(c: String) = {
+  private def parseScope(c: String, config: Config): String = {
     val conf = c.split("->").headOption.getOrElse("compile")
     if (conf.startsWith("default")) {
       "compile"
@@ -58,7 +65,13 @@ object IvyParser {
         case "test" => "test"
         case "runtime" => "runtime"
         case "provided" => "provided"
-        case _ => conf
+        case _ =>
+          try {
+            config.getString("ivy-mapping." + conf)
+          }
+          catch {
+            case e: ConfigException => conf
+          }
       }
     }
   }
