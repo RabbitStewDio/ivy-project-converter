@@ -31,7 +31,7 @@ object IvyParser {
 
   private def parseExclusion(defaultConf: String)(n: Node): ProjectExclusion = {
     val attrs = n.attributes.asAttrMap
-    val org = attrs("org")
+    val org = attrs.get("org")
     val name = attrs.get("module")
     ProjectExclusion(org, name)
   }

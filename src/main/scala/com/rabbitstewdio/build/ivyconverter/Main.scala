@@ -81,7 +81,7 @@ object Main {
 
     def mapExclusion(e: ProjectExclusion): ProjectExclusion = {
       val name = e.name.map(mapProperty)
-      val org = mapProperty(e.org)
+      val org = e.org.map(mapProperty)
       ProjectExclusion(org, name)
     }
 
@@ -170,7 +170,7 @@ object Main {
   def toMavenExclusion(d: ProjectExclusion) = {
     val me = new Exclusion
     me.setArtifactId(d.name.getOrElse("*"))
-    me.setGroupId(d.org)
+    me.setGroupId(d.org.getOrElse("*"))
     me
   }
 
