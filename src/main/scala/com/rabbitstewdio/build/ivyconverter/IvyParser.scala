@@ -7,7 +7,7 @@ import com.typesafe.config.{ConfigException, Config}
 import org.apache.tools.ant.{ProjectHelper, Project}
 
 import scala.collection.JavaConverters._
-import scala.xml.Node
+import scala.xml.{NodeSeq, Node}
 
 object IvyParser {
 
@@ -18,14 +18,17 @@ object IvyParser {
     project.init()
     ProjectHelper.configureProject(project, buildFile)
 
-    val scalaMap = project.getProperties.asInstanceOf[util.Map[String, AnyRef]].asScala
+    val raw: util.Hashtable[String, AnyRef] = project.getProperties
+    val scalaMap = raw.asInstanceOf[util.Map[String, AnyRef]].asScala
     val properties = scalaMap.mapValues(v => String.valueOf(v)).toMap
+    val x = properties("ivy.artifact.group")
 
     val ivyFileRef = properties.getOrElse("ivyfile", "ivy.xml")
     val ivyFile = new File(buildFile.getParentFile, ivyFileRef)
     val parsed = scala.xml.XML.loadFile(ivyFile)
 
-    val defaultConf = (parsed \\ "dependencies/@defaultconf").text
+    val seq: NodeSeq = parsed \\ "dependencies" \ "@defaultconf"
+    val defaultConf = seq.text
     val deps = (parsed \\ "dependency").map(parseDependencies(defaultConf, pd.config))
     ParsedProject(pd.dir, pd.config, properties, deps)
   }
@@ -45,14 +48,16 @@ object IvyParser {
 
   private def parseDependencies(defaultConf: String, config: Config)(n: Node): ProjectDependency = {
     val excludes = (n \\ "exclude").map(parseExclusion(defaultConf)).toList
+    val packaging = (n \\ "artifact" \ "@type").textOption.getOrElse("jar")
     val attrs = n.attributes.asAttrMap
-    val scope = parseScope(attrs.getOrElse("conf", defaultConf), config)
+    val s = attrs.getOrElse("conf", defaultConf)
+    val scope = parseScope(s, config)
     val transitive = attrs.getOrElse("transitive", "true") == "true"
     val rev = attrs("rev")
     val org = attrs("org")
     val name = attrs("name")
     val classifier = attrs.get("m:classifer")
-    ProjectDependency(org, name, rev, transitive, scope, classifier, excludes)
+    ProjectDependency(org, name, rev, transitive, scope, classifier, packaging, excludes)
   }
 
   private def parseScope(c: String, config: Config): String = {
@@ -62,6 +67,7 @@ object IvyParser {
     }
     else {
       conf match {
+        case "" => "compile"
         case "test" => "test"
         case "runtime" => "runtime"
         case "provided" => "provided"
