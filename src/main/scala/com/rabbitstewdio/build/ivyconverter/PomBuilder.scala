@@ -1,16 +1,17 @@
 package com.rabbitstewdio.build.ivyconverter
 
-import java.io.{FileOutputStream, File}
+import java.io.{File, FileOutputStream}
 
-import com.typesafe.config.{Config, ConfigObject}
+import com.typesafe.config.{ConfigException, Config, ConfigObject}
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer
-import org.apache.maven.model.{Parent, Model, Plugin, Resource, Build, PluginExecution}
+import org.apache.maven.model.{Build, Model, Parent, Plugin, PluginExecution, Resource}
 import org.codehaus.plexus.util.xml.Xpp3Dom
+
 import scala.collection.JavaConverters._
 
 object PomBuilder {
 
-  def createResolve(dir: String, scope: String): PluginExecution = {
+  private def createResolve(dir: String, scope: String): PluginExecution = {
     val config = new Xpp3Dom("configuration")
     config.addChild(createText("outputDirectory", dir))
     config.addChild(createText("includeScope", scope))
@@ -24,7 +25,7 @@ object PomBuilder {
 
   }
 
-  def createBuild(project: ParsedProject): Option[Build] = {
+  private def createBuild(project: ParsedProject): Option[Build] = {
 
     val sourceDir = project.queryRelativeDirectory("src.dir")
     val testSourceDir = project.queryRelativeDirectory("testsrc.dir")
@@ -80,8 +81,10 @@ object PomBuilder {
       val configObject: ConfigObject = project.config.getObject("assembly.copy")
       configObject.keySet().asScala.foreach(scope => {
         val dirRef = configObject.toConfig.getString(scope)
-        val dir = project.queryRelativeDirectory(dirRef)
-        dependencies.addExecution(createResolve(dir, scope))
+        if (project.deps.exists(p => p.scope == scope)) {
+          val dir = project.queryRelativeDirectory(dirRef)
+          dependencies.addExecution(createResolve(dir, scope))
+        }
       })
 
       val distinctScopes = plugins.map(p => p.scope).distinct
@@ -98,7 +101,7 @@ object PomBuilder {
     }
   }
 
-  def projectDepdenencyToXppDom(p: ProjectDependency): Xpp3Dom = {
+  private def projectDepdenencyToXppDom(p: ProjectDependency): Xpp3Dom = {
     val item = new Xpp3Dom("artifactItem")
     item.addChild(createText("groupId", p.org))
     item.addChild(createText("artifactId", p.name))
@@ -107,13 +110,13 @@ object PomBuilder {
     item
   }
 
-  def createText(node: String, text: String): Xpp3Dom = {
+  private def createText(node: String, text: String): Xpp3Dom = {
     val dom = new Xpp3Dom(node)
     dom.setValue(text)
     dom
   }
 
-  def processScope(plugins: Seq[ProjectDependency], pd: ParsedProject)(s: String) = {
+  private def processScope(plugins: Seq[ProjectDependency], pd: ParsedProject)(s: String) = {
 
     val pluginsForScope = plugins.withFilter(p => p.scope == s)
 
@@ -121,12 +124,21 @@ object PomBuilder {
     pluginsForScope.map(projectDepdenencyToXppDom).foreach(items.addChild)
 
     val conf = new ConfigWrapper(pd.config, "")
-    val targetDir = if (conf.contains(s"assembly.dirs.$s")) {
-      "${project.basedir}/" + pd.config.getString(s"assembly.dirs.$s")
-    }
-    else {
-      pd.queryRelativeDirectory(pd.config.getString(s"assembly.refs.$s"))
-    }
+    val targetDir =
+      if (conf.contains(s"assembly.dirs.$s")) {
+        "${project.basedir}/" + pd.config.getString(s"assembly.dirs.$s")
+      }
+      else {
+        try {
+          pd.queryRelativeDirectory(pd.config.getString(s"assembly.refs.$s"))
+        }
+        catch {
+          case e: ConfigException => {
+            println(s"Warning: Project ${pd.dir}: Undefined assembly scope $s. Mapping to safe default location.")
+            "${project.basedir}/undefined-lib/pmd"
+          }
+        }
+      }
 
     val config = new Xpp3Dom("configuration")
     config.addChild(createText("outputDirectory", targetDir))
@@ -142,6 +154,8 @@ object PomBuilder {
 
 
   def generateMavenPom(print: Boolean)(proj: ParsedProject) = {
+
+    println (s"INFO: Project ${proj.dir}: Generating POM.")
 
     val model = new Model()
     model.setModelVersion("4.0.0")

@@ -59,9 +59,10 @@ case class ParsedProject(dir: File,
   }
 
   def queryRelativeDirectory(key: String) = {
-    val dir = properties(key)
-    val basedir = properties("basedir") + "/"
-    "${project.basedir}/" + dir.substring(basedir.length)
+    properties.get(key).fold("${" + key + "}")(dir => {
+      val basedir = properties("basedir") + "/"
+      "${project.basedir}/" + dir.substring(basedir.length)
+    })
   }
 
 
