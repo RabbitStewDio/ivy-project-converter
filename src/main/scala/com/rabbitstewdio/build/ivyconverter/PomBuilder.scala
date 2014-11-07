@@ -1,6 +1,8 @@
 package com.rabbitstewdio.build.ivyconverter
 
 import java.io.{File, FileOutputStream}
+import java.util
+import java.util.Properties
 
 import com.typesafe.config.{ConfigException, Config, ConfigObject}
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer
@@ -133,10 +135,9 @@ object PomBuilder {
           pd.queryRelativeDirectory(pd.config.getString(s"assembly.refs.$s"))
         }
         catch {
-          case e: ConfigException => {
+          case e: ConfigException =>
             println(s"Warning: Project ${pd.dir}: Undefined assembly scope $s. Mapping to safe default location.")
             "${project.basedir}/undefined-lib/pmd"
-          }
         }
       }
 
@@ -152,6 +153,13 @@ object PomBuilder {
     processResources
   }
 
+  class SortedProperties(p: Properties) extends java.util.Properties {
+    putAll(p)
+
+    override def keySet() = {
+      new util.TreeSet(super.keySet())
+    }
+  }
 
   def generateMavenPom(print: Boolean)(proj: ParsedProject) = {
 
@@ -163,7 +171,7 @@ object PomBuilder {
     model.setArtifactId(proj.properties("ivy.artifact.id"))
     model.setPackaging(proj.config.getString("properties.packaging"))
     model.setDescription(proj.properties.getOrElse("imple.title", null))
-    model.setProperties(proj.filterProjectProperties)
+    model.setProperties(new SortedProperties(proj.filterProjectProperties))
 
     val group = proj.properties("ivy.artifact.group")
     if (group != model.getParent.getGroupId) {
